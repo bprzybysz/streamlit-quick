@@ -1,0 +1,358 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+logging_mcp_server.py
+requirements.txt
+simple_logger.py
+streamlit_receiver.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+__pycache__/
+.streamlit/
+</file>
+
+<file path="logging_mcp_server.py">
+import logging
+from fastmcp import FastMCP
+
+# Configure basic logging for the server
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Initialize the FastMCP server
+mcp = FastMCP(name="logging-server")
+
+@mcp.tool(name="log_message", description="Logs a message with a specified level.")
+def log_message(message: str, level: str = "info"):
+    """
+    Logs a message using the server's logger.
+    """
+    if level.lower() == "info":
+        logging.info(message)
+    elif level.lower() == "warning":
+        logging.warning(message)
+    elif level.lower() == "error":
+        logging.error(message)
+    else:
+        logging.debug(message) # Default to debug for unknown levels
+    return {"status": "success", "message": f"Logged: {message} with level {level}"}
+
+@mcp.tool(name="get_logs_table", description="Returns a table of simulated log data.")
+def get_logs_table():
+    """
+    Returns a list of dictionaries representing log entries.
+    """
+    logs = [
+        {"timestamp": "2025-07-06 01:00:00", "level": "INFO", "message": "User logged in"},
+        {"timestamp": "2025-07-06 01:01:00", "level": "WARNING", "message": "High CPU usage detected"},
+        {"timestamp": "2025-07-06 01:02:00", "level": "ERROR", "message": "Database connection failed"},
+        {"timestamp": "2025-07-06 01:03:00", "level": "INFO", "message": "Report generated"},
+        {"timestamp": "2025-07-06 01:04:00", "level": "DEBUG", "message": "Function X completed"},
+    ]
+    return {"status": "success", "data": logs}
+
+@mcp.tool(name="generate_pie_chart", description="Generates a Plotly pie chart.")
+def generate_pie_chart(labels: list[str], values: list[float], title: str = "Pie Chart"):
+    """
+    Generates a Plotly pie chart and returns it as an HTML string.
+    """
+    import plotly.graph_objects as go
+
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values)])
+    fig.update_layout(title_text=title)
+    return {"status": "success", "chart_json": fig.to_json()}
+</file>
+
+<file path="requirements.txt">
+streamlit
+fastmcp
+requests
+plotly
+</file>
+
+<file path="simple_logger.py">
+import streamlit as st
+from datetime import datetime
+import time
+import subprocess
+import concurrent.futures
+import requests
+
+# Initialize session state
+if 'logs' not in st.session_state:
+    st.session_state.logs = []
+
+st.title("Checkpoint Logger")
+
+# Initialize ThreadPoolExecutor in session state for git commands and file reading
+if 'executor' not in st.session_state:
+    st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3) # Increased max_workers for 2 file reads + git
+
+# Function to run git command
+def run_git_command(command):
+    return subprocess.check_output(command, cwd=".").decode("utf-8")
+
+# Function to read file content
+def read_file_content(filepath):
+    try:
+        with open(filepath, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"# Error reading file {filepath}: {e}"
+
+# --- MCP Server Integration ---
+MCP_SERVER_URL = "http://localhost:8000/mcp/" # Default FastMCP RPC endpoint
+
+def send_log_to_mcp_server(message: str, level: str, source: str):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "log_message",
+        "params": {"message": f"From Streamlit ({source}): {message}", "level": level},
+        "id": 1 # A simple ID for the request
+    }
+    headers = {'Accept': 'application/json'}
+    try:
+        response = requests.post(MCP_SERVER_URL, json=payload, headers=headers)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        result = response.json()
+        if "result" in result:
+            st.success(f"MCP Server response: {result['result']['message']}")
+        elif "error" in result:
+            st.error(f"MCP Server error: {result['error']['message']}")
+        return result
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"Could not connect to MCP server at {MCP_SERVER_URL}. Is it running? Error: {e}")
+        return {"error": {"message": f"Connection error: {e}"}}
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error sending log to MCP server: {e}")
+        return {"error": {"message": f"Request error: {e}"}}
+
+
+# --- Other Application Content ---
+
+
+st.header("Add Log Entry")
+message = st.text_input("Message")
+level = st.selectbox("Level", ["info", "warning", "error"])
+source = st.text_input("Source", value="agent")
+
+if st.button("Add Log"):
+    # Send log to MCP server
+    send_log_to_mcp_server(message, level, source)
+    
+    # Add to Streamlit's local logs for display
+    entry = {
+        "message": message,
+        "level": level,
+        "source": source,
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    }
+    st.session_state.logs.append(entry)
+    st.success("Log added to Streamlit display!")
+
+st.header("Results (Markdown)")
+
+if st.session_state.logs:
+    markdown_content = "# System Logs\n\n"
+    for log in st.session_state.logs:
+        emoji = {"info": "ℹ️", "warning": "⚠️", "error": "❌"}
+        markdown_content += f"{emoji.get(log['level'], '📝')} **[{log['timestamp']}]** `{log['source']}`: {log['message']}\n\n"
+    
+    st.markdown(markdown_content)
+else:
+    st.info("No logs yet - add some entries!")
+
+st.header("Project Files")
+project_files = [
+    {"file": "simple_logger.py", "description": "The main Streamlit application for logging."},
+    {"file": "requirements.txt", "description": "Lists Python dependencies for the project."},
+    {"file": ".gitignore", "description": "Specifies intentionally untracked files to ignore."},
+    {"file": "venv/", "description": "Python virtual environment for project dependencies."}
+]
+
+file_table_markdown = "| File | Description |\n|---|---|\n"
+for item in project_files:
+    file_table_markdown += f"| {item['file']} | {item['description']} |\n"
+st.markdown(file_table_markdown)
+
+st.header("Streamlit Architecture")
+mermaid_diagram = """
+graph TD
+    A[Client Browser] -->|Requests| B(Streamlit Server)
+    B -->|Serves App| C{Streamlit App}
+    C -->|Renders UI| A
+"""
+st.markdown(f"```mermaid\n{mermaid_diagram}```", unsafe_allow_html=True)
+
+st.header("Git Status")
+
+# Git Status
+if 'git_status_future' not in st.session_state:
+    st.session_state.git_status_future = st.session_state.executor.submit(run_git_command, ["git", "status"])
+
+if st.session_state.git_status_future.running():
+    st.info("Fetching git status...")
+    st.spinner("Loading...")
+    st.rerun()
+else:
+    try:
+        git_status_output = st.session_state.git_status_future.result()
+        st.code(git_status_output, language="bash")
+    except Exception as e:
+        st.error(f"Error getting git status: {e}")
+
+# Git Diff
+if 'git_diff_future' not in st.session_state:
+    st.session_state.git_diff_future = st.session_state.executor.submit(run_git_command, ["git", "diff"])
+
+if st.session_state.git_diff_future.running():
+    st.info("Fetching git diff...")
+    st.spinner("Loading...")
+    st.rerun()
+else:
+    try:
+        git_diff_output = st.session_state.git_diff_future.result()
+        st.code(git_diff_output, language="diff")
+    except Exception as e:
+        st.error(f"Error getting git diff: {e}")
+</file>
+
+<file path="streamlit_receiver.py">
+import streamlit as st
+import asyncio
+from fastmcp.client import Client
+
+async def call_mcp_tool(server_url: str, tool_name: str, tool_arguments: dict) -> str:
+    """
+    Connects to the MCP server, calls a specified tool, and returns the result.
+    """
+    try:
+        async with Client(server_url) as client:
+            result = await client.call_tool(tool_name, tool_arguments)
+            return result.structured_content
+    except Exception as e:
+        return f"Error calling MCP tool: {e}"
+
+def main():
+    st.title("Streamlit MCP Client")
+    st.write("Interact with an MCP server by calling a tool.")
+
+    server_url = st.text_input("MCP Server URL", "http://localhost:8000/mcp/")
+    tool_name = st.text_input("Tool Name", "log_message")
+    message_value = st.text_input("Message", "Hello from Streamlit!")
+    level_value = st.text_input("Level (info, warning, error, debug)", "info")
+
+    tool_arguments = {"message": message_value, "level": level_value}
+
+    if st.button("Call MCP Tool"):
+        if not server_url or not tool_name:
+            st.error("Please fill in all required fields.")
+            return
+
+        st.info(f"Calling tool '{tool_name}' on {server_url} with arguments: {tool_arguments}...")
+        try:
+            result = asyncio.run(call_mcp_tool(server_url, tool_name, tool_arguments))
+            st.subheader("Tool Result")
+            st.json(result)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    if st.button("Get Log Table"):
+        st.info("Fetching log table from MCP server...")
+        try:
+            result = asyncio.run(call_mcp_tool(server_url, "get_logs_table", {}))
+            st.json(result)
+            if isinstance(result, str): # Check if it's an error string
+                st.error(result)
+            else:
+                if result.get("status") == "success" and "data" in result:
+                    st.subheader("Log Table")
+                    st.dataframe(result["data"])
+                else:
+                    st.error(f"Failed to get log table: {result.get('message', 'Unknown error')}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    st.subheader("Generate Pie Chart")
+    chart_labels = st.text_input("Chart Labels (comma-separated)", "A,B,C")
+    chart_values = st.text_input("Chart Values (comma-separated numbers)", "10,20,30")
+    chart_title = st.text_input("Chart Title", "My Pie Chart")
+
+    if st.button("Generate Pie Chart"):
+        try:
+            labels_list = [label.strip() for label in chart_labels.split(',')]
+            values_list = [float(value.strip()) for value in chart_values.split(',')]
+
+            if len(labels_list) != len(values_list):
+                st.error("Labels and Values must have the same number of elements.")
+                return
+
+            st.info("Generating pie chart on MCP server...")
+            tool_arguments = {"labels": labels_list, "values": values_list, "title": chart_title}
+            result = asyncio.run(call_mcp_tool(server_url, "generate_pie_chart", tool_arguments))
+            st.json(result)
+
+            if isinstance(result, str): # Check if it's an error string
+                st.error(result)
+            else:
+                if result.get("status") == "success" and "chart_html" in result:
+                    import plotly.graph_objects as go
+                    import json
+                    st.subheader("Generated Pie Chart")
+                    fig = go.Figure(json.loads(result["chart_json"]))
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.error(f"Failed to generate pie chart: {result.get('message', 'Unknown error')}")
+        except ValueError:
+            st.error("Please enter valid numbers for chart values.")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
+</file>
+
+</files>

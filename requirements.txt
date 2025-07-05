@@ -1,1 +1,4 @@
 streamlit
+fastmcp
+requests
+plotly
