@@ -47,4 +47,98 @@ def generate_pie_chart(labels: list[str], values: list[float], title: str = "Pie
     fig.update_layout(title_text=title)
     return {"status": "success", "chart_json": fig.to_json()}
 
+@mcp.tool(name="generate_sunburst_chart", description="Generates a Plotly sunburst chart for hierarchical data visualization.")
+def generate_sunburst_chart(data_type: str = "company_structure"):
+    """
+    Generates a Plotly sunburst chart with interesting hierarchical data.
+    
+    Args:
+        data_type: Type of data to visualize ("company_structure", "tech_stack", "sales_regions", "project_breakdown")
+    """
+    import plotly.express as px
+    import pandas as pd
+    
+    # Define different interesting datasets
+    datasets = {
+        "company_structure": {
+            "names": ["TechCorp", "Engineering", "Sales", "Marketing", "HR", 
+                     "Frontend", "Backend", "DevOps", "Direct Sales", "Online Sales", 
+                     "Channel Partners", "Content Marketing", "Digital Marketing", 
+                     "SEO/SEM", "Recruitment", "Training", "Benefits"],
+            "parents": ["", "TechCorp", "TechCorp", "TechCorp", "TechCorp",
+                       "Engineering", "Engineering", "Engineering", "Sales", "Sales",
+                       "Sales", "Marketing", "Marketing", "Marketing", "HR", "HR", "HR"],
+            "values": [500, 200, 150, 100, 50,
+                      80, 70, 50, 60, 50, 40, 40, 35, 25, 20, 20, 10],
+            "title": "Company Organizational Structure"
+        },
+        
+        "tech_stack": {
+            "names": ["Tech Stack", "Frontend", "Backend", "Database", "DevOps",
+                     "React", "Vue", "Angular", "Python", "Node.js", "Java",
+                     "PostgreSQL", "MongoDB", "Redis", "Docker", "Kubernetes", "AWS"],
+            "parents": ["", "Tech Stack", "Tech Stack", "Tech Stack", "Tech Stack",
+                       "Frontend", "Frontend", "Frontend", "Backend", "Backend", "Backend",
+                       "Database", "Database", "Database", "DevOps", "DevOps", "DevOps"],
+            "values": [1000, 300, 400, 200, 100,
+                      120, 100, 80, 180, 120, 100,
+                      80, 70, 50, 40, 35, 25],
+            "title": "Technology Stack Distribution"
+        },
+        
+        "sales_regions": {
+            "names": ["Global Sales", "North America", "Europe", "Asia Pacific",
+                     "USA", "Canada", "Mexico", "UK", "Germany", "France",
+                     "Japan", "China", "Australia", "India"],
+            "parents": ["", "Global Sales", "Global Sales", "Global Sales",
+                       "North America", "North America", "North America", 
+                       "Europe", "Europe", "Europe",
+                       "Asia Pacific", "Asia Pacific", "Asia Pacific", "Asia Pacific"],
+            "values": [10000, 4500, 3000, 2500,
+                      3000, 1000, 500, 1200, 800, 1000,
+                      800, 700, 500, 500],
+            "title": "Sales Performance by Region (in thousands)"
+        },
+        
+        "project_breakdown": {
+            "names": ["Software Project", "Development", "Testing", "Documentation", "Management",
+                     "Core Features", "UI/UX", "API", "Unit Tests", "Integration Tests", "E2E Tests",
+                     "User Manual", "API Docs", "Code Comments", "Planning", "Monitoring", "Reviews"],
+            "parents": ["", "Software Project", "Software Project", "Software Project", "Software Project",
+                       "Development", "Development", "Development", "Testing", "Testing", "Testing",
+                       "Documentation", "Documentation", "Documentation", "Management", "Management", "Management"],
+            "values": [800, 400, 200, 120, 80,
+                      200, 120, 80, 80, 70, 50,
+                      50, 40, 30, 30, 30, 20],
+            "title": "Software Project Time Allocation (hours)"
+        }
+    }
+    
+    # Get the selected dataset or default to company_structure
+    selected_data = datasets.get(data_type, datasets["company_structure"])
+    
+    # Create DataFrame
+    df = pd.DataFrame(selected_data)
+    
+    # Create sunburst chart
+    fig = px.sunburst(
+        df,
+        names='names',
+        parents='parents', 
+        values='values',
+        title=selected_data['title'],
+        color='values',
+        color_continuous_scale='Viridis',
+        hover_data={'values': ':,'}
+    )
+    
+    # Customize the layout
+    fig.update_layout(
+        font_size=12,
+        title_font_size=16,
+        margin=dict(t=50, l=25, r=25, b=25)
+    )
+    
+    return {"status": "success", "chart_json": fig.to_json(), "data_type": data_type}
+
 

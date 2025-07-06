@@ -2,3 +2,4 @@ streamlit
 fastmcp
 requests
 plotly
+pandas>=2.0.0

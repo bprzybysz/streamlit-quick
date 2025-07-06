@@ -151,5 +151,52 @@ def main():
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
+    st.subheader("Generate Sunburst Chart")
+    data_type = st.selectbox(
+        "Select Data Type",
+        ["company_structure", "tech_stack", "sales_regions", "project_breakdown"],
+        help="Choose the type of hierarchical data to visualize"
+    )
+
+    data_descriptions = {
+        "company_structure": "Organizational hierarchy with departments and teams",
+        "tech_stack": "Technology stack breakdown by categories",
+        "sales_regions": "Sales performance across global regions", 
+        "project_breakdown": "Software project time allocation by activities"
+    }
+
+    st.info(f"📊 {data_descriptions[data_type]}")
+
+    if st.button("Generate Sunburst Chart"):
+        st.info("Generating sunburst chart on MCP server...")
+        try:
+            tool_arguments = {"data_type": data_type}
+            result = asyncio.run(call_mcp_tool(server_url, "generate_sunburst_chart", tool_arguments))
+            
+
+            
+            if isinstance(result, dict) and result.get("status") == "success" and "chart_json" in result:
+                import plotly.io as pio
+                
+                st.subheader(f"Generated Sunburst Chart: {result.get('data_type', 'Unknown')}")
+                
+                # Use plotly.io.from_json to properly parse the JSON
+                fig = pio.from_json(result["chart_json"])
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Add some helpful information
+                st.markdown("""
+                **💡 How to interact with the sunburst chart:**
+                - Click on any segment to zoom into that hierarchy level
+                - Click the center to zoom back out
+                - Hover over segments to see detailed values
+                - The color intensity represents the relative values
+                """)
+            else:
+                st.error(f"Failed to generate sunburst chart: {result.get('message', 'Unknown error')}")
+                
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
 if __name__ == "__main__":
     main()
