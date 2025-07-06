@@ -141,4 +141,92 @@ def generate_sunburst_chart(data_type: str = "company_structure"):
     
     return {"status": "success", "chart_json": fig.to_json(), "data_type": data_type}
 
+@mcp.tool(name="generate_mermaid_diagram", description="Generates a Mermaid diagram for various types of visualizations.")
+def generate_mermaid_diagram(diagram_type: str = "flowchart", content: str = ""):
+    """
+    Generates a Mermaid diagram based on type and content.
+    
+    Args:
+        diagram_type: Type of diagram ("flowchart", "sequence", "gantt", "pie", "gitgraph", "mindmap")
+        content: Custom content or use predefined examples if empty
+    """
+    
+    # Predefined diagram templates
+    templates = {
+        "flowchart": """
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Process A]
+    B -->|No| D[Process B]
+    C --> E[End]
+    D --> E
+""",
+        "sequence": """
+sequenceDiagram
+    participant A as Client
+    participant B as Server
+    participant C as Database
+    
+    A->>B: Request Data
+    B->>C: Query Database
+    C-->>B: Return Results
+    B-->>A: Send Response
+""",
+        "gantt": """
+gantt
+    title Project Timeline
+    dateFormat  YYYY-MM-DD
+    section Phase 1
+    Planning    :done, p1, 2025-01-01, 2025-01-15
+    Design      :active, d1, 2025-01-10, 2025-01-25
+    section Phase 2
+    Development :dev1, 2025-01-20, 2025-03-01
+    Testing     :test1, after dev1, 30d
+""",
+        "pie": """
+pie title Project Resources
+    "Development" : 45
+    "Testing" : 25
+    "Documentation" : 15
+    "Management" : 15
+""",
+        "gitgraph": """
+gitgraph
+    commit
+    branch feature
+    checkout feature
+    commit
+    commit
+    checkout main
+    merge feature
+    commit
+""",
+        "mindmap": """
+mindmap
+  root((MCP Architecture))
+    Client
+      Streamlit UI
+      FastMCP Client
+    Server
+      Tools
+      Resources
+    Protocol
+      JSON-RPC
+      WebSocket
+"""
+    }
+    
+    # Use custom content if provided, otherwise use template
+    if content.strip():
+        mermaid_code = content
+    else:
+        mermaid_code = templates.get(diagram_type, templates["flowchart"])
+    
+    return {
+        "status": "success", 
+        "mermaid_code": mermaid_code,
+        "diagram_type": diagram_type,
+        "message": f"Generated {diagram_type} diagram successfully"
+    }
+
 

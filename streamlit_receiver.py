@@ -173,8 +173,6 @@ def main():
             tool_arguments = {"data_type": data_type}
             result = asyncio.run(call_mcp_tool(server_url, "generate_sunburst_chart", tool_arguments))
             
-
-            
             if isinstance(result, dict) and result.get("status") == "success" and "chart_json" in result:
                 import plotly.io as pio
                 
@@ -197,6 +195,133 @@ def main():
                 
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
+    # Mermaid Diagram Section
+    st.subheader("Generate Mermaid Diagram")
+    
+    # Diagram type selection with descriptions
+    diagram_types = {
+        "flowchart": "📊 Flowchart - Process flows and decision trees",
+        "sequence": "🔄 Sequence - Interaction between entities over time", 
+        "gantt": "📅 Gantt - Project timeline and scheduling",
+        "pie": "🥧 Pie Chart - Data distribution visualization",
+        "gitgraph": "🌳 Git Graph - Version control branching",
+        "mindmap": "🧠 Mind Map - Hierarchical concept mapping"
+    }
+
+    selected_diagram_type = st.selectbox(
+        "Select Diagram Type",
+        list(diagram_types.keys()),
+        format_func=lambda x: diagram_types[x],
+        help="Choose the type of Mermaid diagram to generate"
+    )
+
+    # Custom content option
+    use_custom_content = st.checkbox("Use Custom Mermaid Code", help="Check to provide your own Mermaid syntax")
+
+    custom_content = ""
+    if use_custom_content:
+        custom_content = st.text_area(
+            "Custom Mermaid Code",
+            placeholder="Enter your Mermaid diagram syntax here...",
+            height=150,
+            help="Write your own Mermaid diagram code. Leave empty to use predefined template."
+        )
+
+    # Show example for selected type
+    if not use_custom_content:
+        with st.expander(f"Preview {selected_diagram_type} template"):
+            st.info(f"This will generate a sample {selected_diagram_type} diagram using predefined content.")
+
+    if st.button("Generate Mermaid Diagram"):
+        st.info("Generating Mermaid diagram on MCP server...")
+        try:
+            tool_arguments = {
+                "diagram_type": selected_diagram_type,
+                "content": custom_content if use_custom_content else ""
+            }
+            result = asyncio.run(call_mcp_tool(server_url, "generate_mermaid_diagram", tool_arguments))
+            
+            # Debug: Show the raw result
+            with st.expander("Debug: Raw Result"):
+                st.json(result)
+            
+            if isinstance(result, dict) and result.get("status") == "success" and "mermaid_code" in result:
+                st.subheader(f"Generated {result.get('diagram_type', 'Unknown')} Diagram")
+                
+                # Display the Mermaid code
+                st.code(result["mermaid_code"], language="mermaid")
+                
+                # Enhanced Mermaid rendering
+                mermaid_html = render_mermaid_diagram(result["mermaid_code"])
+                st.markdown(mermaid_html, unsafe_allow_html=True)
+                
+                # Add helpful information
+                st.markdown("""
+                **💡 About Mermaid Diagrams:**
+                - Copy the code above to use in GitHub, GitLab, or Notion
+                - Mermaid diagrams are text-based and version-control friendly
+                - You can edit the code and regenerate for customization
+                """)
+                
+                # Download option
+                st.download_button(
+                    label="📥 Download Mermaid Code",
+                    data=result["mermaid_code"],
+                    file_name=f"mermaid_{result.get('diagram_type', 'diagram')}.md",
+                    mime="text/markdown"
+                )
+                
+            else:
+                st.error(f"Failed to generate Mermaid diagram: {result.get('message', 'Unknown error')}")
+                
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+def render_mermaid_diagram(mermaid_code: str, diagram_id: str = "mermaid-diagram"):
+    """Enhanced Mermaid diagram rendering with proper JavaScript integration."""
+    
+    # Create unique ID for this diagram
+    import hashlib
+    unique_id = f"{diagram_id}-{hashlib.md5(mermaid_code.encode()).hexdigest()[:8]}"
+    
+    mermaid_html = f"""
+    <div id="{unique_id}" style="text-align: center; margin: 20px 0;">
+        <div class="mermaid">
+{mermaid_code}
+        </div>
+    </div>
+    
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({{
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Arial, sans-serif'
+        }});
+        
+        // Re-render if already initialized
+        if (window.mermaidInitialized) {{
+            mermaid.init(undefined, document.querySelectorAll('#{unique_id} .mermaid'));
+        }} else {{
+            window.mermaidInitialized = true;
+        }}
+    </script>
+    
+    <style>
+        #{unique_id} .mermaid {{
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+        }}
+    </style>
+    """
+    
+    return mermaid_html
 
 if __name__ == "__main__":
     main()
